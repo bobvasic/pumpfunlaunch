@@ -34,20 +34,27 @@ export function BackendStatus() {
     )
   }
 
+  // Backend is available if health check succeeded
+  // Ankr SDK status is separate - shown in tooltip
+  const isBackendRunning = backendAvailable
+  const hasAnkrKey = health?.ankr_sdk_ready
+
   return (
     <>
       <Tooltip
         title={
-          backendAvailable
-            ? `Python Backend: Connected (${health?.latency_ms}ms)`
+          isBackendRunning
+            ? hasAnkrKey
+              ? `Python Backend: Connected with Ankr SDK (${health?.latency_ms}ms)`
+              : `Python Backend: Connected (Public RPC - ${health?.latency_ms}ms)`
             : 'Python Backend: Not connected. Run: cd backend && python main.py'
         }
       >
         <Chip
-          icon={backendAvailable ? <CloudDoneIcon /> : <CloudOffIcon />}
-          label={backendAvailable ? 'Backend OK' : 'Backend Offline'}
+          icon={isBackendRunning ? <CloudDoneIcon /> : <CloudOffIcon />}
+          label={isBackendRunning ? 'Backend OK' : 'Backend Offline'}
           size="small"
-          color={backendAvailable ? 'success' : 'warning'}
+          color={isBackendRunning ? 'success' : 'warning'}
           variant="outlined"
           onClick={() => checkHealth()}
           sx={{ cursor: 'pointer' }}
