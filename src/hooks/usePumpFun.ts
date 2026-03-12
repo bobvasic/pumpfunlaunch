@@ -202,7 +202,7 @@ export function usePumpFun() {
       if (confirmation.value.err) {
         console.error('Transaction failed:', confirmation.value.err)
         console.error('Transaction signature:', signature)
-        console.error('Mint address:', mint.publicKey.toBase58())
+        console.error('Mint address:', mintKeypair.publicKey.toBase58())
         throw new Error('Transaction failed: ' + JSON.stringify(confirmation.value.err))
       }
 
@@ -212,7 +212,7 @@ export function usePumpFun() {
       )
 
       return {
-        mint: mint.toBase58(),
+        mint: mintKeypair.publicKey.toBase58(),
         signature,
         name: metadata.name,
         symbol: metadata.symbol,
