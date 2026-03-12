@@ -14,14 +14,15 @@ import CloudOffIcon from '@mui/icons-material/CloudOff'
 import { usePythonBackend } from '../hooks/usePythonBackend'
 
 export function BackendStatus() {
-  const { health, loading, backendAvailable, checkHealth } = usePythonBackend()
+  const { health, loading, error, backendAvailable, checkHealth } = usePythonBackend()
   const [showAlert, setShowAlert] = useState(false)
 
   useEffect(() => {
+    console.log('[BackendStatus] backendAvailable:', backendAvailable, 'error:', error)
     if (!backendAvailable && !loading) {
       setShowAlert(true)
     }
-  }, [backendAvailable, loading])
+  }, [backendAvailable, loading, error])
 
   if (loading) {
     return (
@@ -35,7 +36,6 @@ export function BackendStatus() {
   }
 
   // Backend is available if health check succeeded
-  // Ankr SDK status is separate - shown in tooltip
   const isBackendRunning = backendAvailable
   const hasAnkrKey = health?.ankr_sdk_ready
 
@@ -47,7 +47,7 @@ export function BackendStatus() {
             ? hasAnkrKey
               ? `Python Backend: Connected with Ankr SDK (${health?.latency_ms}ms)`
               : `Python Backend: Connected (Public RPC - ${health?.latency_ms}ms)`
-            : 'Python Backend: Not connected. Run: cd backend && python main.py'
+            : error || 'Python Backend: Not connected'
         }
       >
         <Chip
@@ -78,11 +78,21 @@ export function BackendStatus() {
         >
           <Box component="div" sx={{ fontSize: '0.875rem' }}>
             <strong>Python Backend Not Running</strong>
+            {error && (
+              <>
+                <br />
+                <span style={{ color: 'red' }}>Error: {error}</span>
+              </>
+            )}
             <br />
             The app will use direct RPC instead. To use Ankr SDK features:
             <Box component="code" sx={{ display: 'block', mt: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
               cd backend && pip install -r requirements.txt && python main.py
             </Box>
+            <br />
+            <a href="/test.html" target="_blank" style={{ color: '#00d084' }}>
+              🔧 Click here to test backend connection
+            </a>
           </Box>
         </Alert>
       </Collapse>

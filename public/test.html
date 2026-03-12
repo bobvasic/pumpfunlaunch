@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Backend Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .success { color: green; }
+    .error { color: red; }
+    pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Backend Connection Test</h1>
+  <div id="result">Testing...</div>
+  
+  <script>
+    async function testBackend() {
+      const resultDiv = document.getElementById('result');
+      
+      try {
+        console.log('Testing backend at: http://localhost:8000/health');
+        const response = await fetch('http://localhost:8000/health');
+        
+        console.log('Response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          resultDiv.innerHTML = `
+            <h2 class="success">✅ Backend is RUNNING!</h2>
+            <p>Status: ${data.status}</p>
+            <p>Ankr SDK Ready: ${data.ankr_sdk_ready}</p>
+            <p>Block Height: ${data.block_height}</p>
+            <p>Latency: ${data.latency_ms}ms</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        } else {
+          resultDiv.innerHTML = `
+            <h2 class="error">❌ Backend returned error</h2>
+            <p>Status: ${response.status}</p>
+          `;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <h2 class="error">❌ Cannot connect to backend</h2>
+          <p>Error: ${error.message}</p>
+          <p>Make sure backend is running: <code>cd backend && python main.py</code></p>
+        `;
+        console.error('Error:', error);
+      }
+    }
+    
+    testBackend();
+  </script>
+</body>
+</html>
