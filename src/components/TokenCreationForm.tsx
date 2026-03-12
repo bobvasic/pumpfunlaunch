@@ -10,7 +10,6 @@ import {
   InputAdornment,
   Chip,
   Avatar,
-  Slider,
   Alert,
   CircularProgress,
   FormHelperText,
@@ -20,29 +19,38 @@ import AddCircleIcon from '@mui/icons-material/AddCircle'
 import TwitterIcon from '@mui/icons-material/Twitter'
 import TelegramIcon from '@mui/icons-material/Telegram'
 import LanguageIcon from '@mui/icons-material/Language'
-import { usePumpFun, TokenCreationData } from '../hooks/usePumpFun'
+import { useSPLToken, SPLTokenCreationData } from '../hooks/useSPLToken'
 
 export function TokenCreationForm() {
-  const { createToken, creating } = usePumpFun()
+  const { createToken, creating } = useSPLToken()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [formData, setFormData] = useState<TokenCreationData>({
+  const [formData, setFormData] = useState<SPLTokenCreationData>({
     name: '',
     symbol: '',
     description: '',
+    decimals: 6,
+    initialSupply: 1000000, // 1 million tokens
     twitter: '',
     telegram: '',
     website: '',
   })
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [initialBuy, setInitialBuy] = useState<number>(0.1)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [createdToken, setCreatedToken] = useState<{
+    mint: string
+    signature: string
+  } | null>(null)
 
-  const handleInputChange = (field: keyof TokenCreationData) => (
+  const handleInputChange = (field: keyof SPLTokenCreationData) => (
     e: ChangeEvent<HTMLInputElement>
   ) => {
-    setFormData((prev) => ({ ...prev, [field]: e.target.value }))
+    const value = field === 'decimals' || field === 'initialSupply' 
+      ? parseInt(e.target.value) || 0
+      : e.target.value
+    
+    setFormData((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: '' }))
     }
@@ -74,6 +82,12 @@ export function TokenCreationForm() {
     if (!formData.description || formData.description.length < 10) {
       newErrors.description = 'Description must be at least 10 characters'
     }
+    if (formData.decimals < 0 || formData.decimals > 9) {
+      newErrors.decimals = 'Decimals must be between 0 and 9'
+    }
+    if (formData.initialSupply <= 0) {
+      newErrors.initialSupply = 'Initial supply must be greater than 0'
+    }
     if (!imagePreview) {
       newErrors.image = 'Token image is required'
     }
@@ -85,23 +99,28 @@ export function TokenCreationForm() {
   const handleSubmit = async () => {
     if (!validate()) return
 
-    const result = await createToken(
-      { ...formData, image: imagePreview || undefined },
-      initialBuy > 0 ? initialBuy : undefined
-    )
+    const result = await createToken({
+      ...formData,
+      image: imagePreview || undefined,
+    })
 
     if (result) {
+      setCreatedToken({
+        mint: result.mint.toBase58(),
+        signature: result.signature,
+      })
       // Reset form
       setFormData({
         name: '',
         symbol: '',
         description: '',
+        decimals: 6,
+        initialSupply: 1000000,
         twitter: '',
         telegram: '',
         website: '',
       })
       setImagePreview(null)
-      setInitialBuy(0.1)
     }
   }
 
@@ -109,11 +128,30 @@ export function TokenCreationForm() {
     <Card>
       <CardContent sx={{ p: 4 }}>
         <Typography variant="h5" gutterBottom fontWeight={600}>
-          Create New Token
+          Create New SPL Token
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Launch your memecoin on pump.fun with instant liquidity
+          Create a standard Solana SPL token with your own metadata
         </Typography>
+
+        {createdToken && (
+          <Alert severity="success" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              Token created successfully!
+              <br />
+              <strong>Mint:</strong> {createdToken.mint}
+              <br />
+              <a
+                href={`https://solscan.io/tx/${createdToken.signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#00d084' }}
+              >
+                View on Solscan
+              </a>
+            </Typography>
+          </Alert>
+        )}
 
         <Grid container spacing={3}>
           {/* Token Image Upload */}
@@ -169,7 +207,7 @@ export function TokenCreationForm() {
             <TextField
               fullWidth
               label="Token Name"
-              placeholder="e.g., Moon Rocket"
+              placeholder="e.g., My Token"
               value={formData.name}
               onChange={handleInputChange('name')}
               error={!!errors.name}
@@ -182,13 +220,42 @@ export function TokenCreationForm() {
             <TextField
               fullWidth
               label="Token Symbol"
-              placeholder="e.g., MOON"
+              placeholder="e.g., TOKEN"
               value={formData.symbol}
               onChange={handleInputChange('symbol')}
               error={!!errors.symbol}
               helperText={errors.symbol}
               disabled={creating}
               inputProps={{ style: { textTransform: 'uppercase' } }}
+            />
+          </Grid>
+
+          {/* Decimals & Initial Supply */}
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Decimals"
+              value={formData.decimals}
+              onChange={handleInputChange('decimals')}
+              error={!!errors.decimals}
+              helperText={errors.decimals || "Usually 6 (like USDC) or 9"}
+              disabled={creating}
+              InputProps={{ inputProps: { min: 0, max: 9 } }}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Initial Supply"
+              value={formData.initialSupply}
+              onChange={handleInputChange('initialSupply')}
+              error={!!errors.initialSupply}
+              helperText={errors.initialSupply || "Number of tokens to mint"}
+              disabled={creating}
+              InputProps={{ inputProps: { min: 1 } }}
             />
           </Grid>
 
@@ -269,35 +336,11 @@ export function TokenCreationForm() {
             />
           </Grid>
 
-          {/* Initial Buy */}
-          <Grid item xs={12}>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Initial Buy Amount: {initialBuy} SOL
-              </Typography>
-              <Slider
-                value={initialBuy}
-                onChange={(_, value) => setInitialBuy(value as number)}
-                min={0}
-                max={10}
-                step={0.1}
-                marks={[
-                  { value: 0, label: '0' },
-                  { value: 5, label: '5' },
-                  { value: 10, label: '10' },
-                ]}
-                disabled={creating}
-              />
-              <FormHelperText>
-                Buy tokens immediately after creation (optional)
-              </FormHelperText>
-            </Box>
-          </Grid>
-
           {/* Submit Button */}
           <Grid item xs={12}>
             <Alert severity="info" sx={{ mb: 2 }}>
               Creating a token requires approximately 0.02 SOL for rent and fees.
+              Initial supply will be minted to your wallet.
             </Alert>
             <Button
               fullWidth
@@ -308,7 +351,7 @@ export function TokenCreationForm() {
               disabled={creating}
               sx={{ py: 2 }}
             >
-              {creating ? 'Creating Token...' : 'Create Token'}
+              {creating ? 'Creating Token...' : 'Create SPL Token'}
             </Button>
           </Grid>
         </Grid>
