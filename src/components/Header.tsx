@@ -14,6 +14,7 @@ import { useWallet } from '@solana/wallet-adapter-react'
 import { WalletButton } from './WalletButton'
 import { useWalletBalance } from '../hooks/useWalletBalance'
 import { BackendStatus } from './BackendStatus'
+import { PinataStatus } from './PinataStatus'
 
 export function Header() {
   const { publicKey } = useWallet()

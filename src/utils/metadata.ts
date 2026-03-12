@@ -1,4 +1,10 @@
 import axios from 'axios'
+import {
+  uploadTokenMetadataToPinata,
+  uploadImageToPinata,
+  testPinataConnection,
+  PinataConfig,
+} from './pinata'
 
 export interface TokenMetadata {
   name: string
@@ -17,34 +23,78 @@ export interface UploadedMetadata {
   imageUri?: string
 }
 
+// Get Pinata config from environment
+function getPinataConfig(): PinataConfig | null {
+  // Check for JWT first
+  const jwt = import.meta.env.VITE_PINATA_JWT
+  if (jwt && jwt !== 'your_pinata_jwt_token_here') {
+    return { jwt }
+  }
+  
+  // Fall back to API Key + Secret
+  const apiKey = import.meta.env.VITE_PINATA_API_KEY
+  const apiSecret = import.meta.env.VITE_PINATA_API_SECRET
+  
+  if (apiKey && apiSecret && 
+      apiKey !== 'your_pinata_api_key_here' && 
+      apiSecret !== 'your_pinata_api_secret_here') {
+    return { apiKey, apiSecret }
+  }
+  
+  return null
+}
+
 /**
- * Upload token metadata to a storage service
- * In production, this should use Irys (formerly Bundlr) or Arweave
- * 
- * For development/testing, you can use:
- * 1. Irys Network (recommended for pump.fun)
- * 2. Arweave via Bundlr
- * 3. IPFS via Pinata or NFT.Storage
- * 4. Temporary mock for testing
+ * Upload token metadata using Pinata (recommended) or mock fallback
  */
 export async function uploadTokenMetadata(
   metadata: TokenMetadata,
   imageFile?: File
 ): Promise<UploadedMetadata> {
-  // For production, implement actual upload to Irys/Arweave
-  // This is a placeholder implementation
-
-  let imageUri: string | undefined
-
-  // Upload image if provided
-  if (imageFile) {
-    imageUri = await uploadImage(imageFile)
-  } else if (metadata.image?.startsWith('data:')) {
-    // Handle base64 image data
-    imageUri = await uploadBase64Image(metadata.image)
+  // Try Pinata first
+  const pinataConfig = getPinataConfig()
+  
+  if (pinataConfig) {
+    try {
+      console.log('Using Pinata for metadata upload...')
+      const result = await uploadTokenMetadataToPinata(
+        {
+          name: metadata.name,
+          symbol: metadata.symbol,
+          description: metadata.description,
+          image: metadata.image || '',
+          twitter: metadata.twitter,
+          telegram: metadata.telegram,
+          website: metadata.website,
+        },
+        pinataConfig
+      )
+      return result
+    } catch (error) {
+      console.warn('Pinata upload failed, falling back to mock:', error)
+    }
   }
+  
+  // Fallback to mock (for development)
+  console.warn('Using mock metadata upload - configure Pinata in .env for production')
+  return mockUploadMetadata(metadata, imageFile)
+}
 
-  // Prepare metadata JSON
+/**
+ * Mock upload for development
+ */
+async function mockUploadMetadata(
+  metadata: TokenMetadata,
+  imageFile?: File
+): Promise<UploadedMetadata> {
+  let imageUri: string | undefined
+  
+  if (imageFile) {
+    imageUri = `https://mock.storage/image-${Date.now()}.png`
+  } else if (metadata.image?.startsWith('data:')) {
+    imageUri = `https://mock.storage/image-${Date.now()}.png`
+  }
+  
   const tokenMetadata = {
     name: metadata.name,
     symbol: metadata.symbol,
@@ -56,110 +106,92 @@ export async function uploadTokenMetadata(
     showName: true,
     createdOn: 'https://pump.fun',
   }
-
-  // Upload metadata JSON
-  const metadataUri = await uploadJson(tokenMetadata)
-
+  
+  // Simulate upload delay
+  await new Promise(resolve => setTimeout(resolve, 500))
+  
+  const metadataUri = `https://mock.storage/metadata-${Date.now()}.json`
+  
+  console.log('Mock metadata uploaded:', metadataUri)
   return { metadataUri, imageUri }
 }
 
 /**
- * Upload image to storage
- * Replace with actual Irys implementation for production
+ * Upload image - tries Pinata first, falls back to mock
  */
-async function uploadImage(file: File): Promise<string> {
-  // Production implementation using Irys:
-  /*
-  const irys = new Irys({
-    url: 'https://node1.irys.xyz',
-    token: 'solana',
-    key: process.env.PRIVATE_KEY,
-  })
+export async function uploadImage(file: File): Promise<string> {
+  const pinataConfig = getPinataConfig()
   
-  const receipt = await irys.uploadFile(file)
-  return `https://arweave.net/${receipt.id}`
-  */
-
-  // For development, return a mock URL or use a temporary upload service
-  console.warn('Using mock image upload - replace with Irys for production')
+  if (pinataConfig) {
+    try {
+      return await uploadImageToPinata(file, pinataConfig)
+    } catch (error) {
+      console.warn('Pinata image upload failed:', error)
+    }
+  }
+  
+  console.warn('Using mock image upload - configure Pinata for production')
+  await new Promise(resolve => setTimeout(resolve, 300))
   return `https://mock.storage/image-${Date.now()}.png`
 }
 
 /**
  * Upload base64 image
  */
-async function uploadBase64Image(base64Data: string): Promise<string> {
-  // Convert base64 to file and upload
-  const response = await fetch(base64Data)
-  const blob = await response.blob()
-  const file = new File([blob], `image-${Date.now()}.png`, { type: 'image/png' })
-  return uploadImage(file)
-}
-
-/**
- * Upload JSON metadata
- * Replace with actual Irys implementation for production
- */
-async function uploadJson(metadata: object): Promise<string> {
-  // Production implementation using Irys:
-  /*
-  const irys = new Irys({
-    url: 'https://node1.irys.xyz',
-    token: 'solana',
-    key: process.env.PRIVATE_KEY,
-  })
+export async function uploadBase64Image(base64Data: string): Promise<string> {
+  const pinataConfig = getPinataConfig()
   
-  const data = JSON.stringify(metadata)
-  const receipt = await irys.upload(data)
-  return `https://arweave.net/${receipt.id}`
-  */
-
-  // For development, you can use a temporary service or mock
-  console.warn('Using mock metadata upload - replace with Irys for production')
-  
-  // Option: Use a temporary JSON storage service for testing
-  try {
-    const response = await axios.post('https://jsonblob.com/api/jsonBlob', metadata)
-    const blobUrl = response.headers.location
-    return blobUrl
-  } catch (error) {
-    // Fallback to mock URL
-    return `https://mock.storage/metadata-${Date.now()}.json`
+  if (pinataConfig) {
+    try {
+      const { uploadBase64ImageToPinata } = await import('./pinata')
+      return await uploadBase64ImageToPinata(
+        base64Data,
+        `image-${Date.now()}.png`,
+        pinataConfig
+      )
+    } catch (error) {
+      console.warn('Pinata base64 upload failed:', error)
+    }
   }
+  
+  console.warn('Using mock base64 upload')
+  await new Promise(resolve => setTimeout(resolve, 300))
+  return `https://mock.storage/image-${Date.now()}.png`
 }
 
 /**
- * Irys upload implementation (for production use)
- * 
- * Install: npm install @irys/sdk
- * 
- * Example usage:
- * ```typescript
- * import { default as Irys } from '@irys/sdk';
- * 
- * const irys = new Irys({
- *   url: 'https://node1.irys.xyz',
- *   token: 'solana',
- *   key: privateKey,
- * });
- * 
- * // Upload image
- * const imageReceipt = await irys.uploadFile(imageFile);
- * const imageUri = `https://arweave.net/${imageReceipt.id}`;
- * 
- * // Upload metadata
- * const metadataReceipt = await irys.upload(JSON.stringify(metadataJson));
- * const metadataUri = `https://arweave.net/${metadataReceipt.id}`;
- * ```
+ * Test Pinata connection
  */
-export async function uploadWithIrys(
-  _metadata: TokenMetadata,
-  _imageFile: File,
-  _privateKey: string
-): Promise<UploadedMetadata> {
-  throw new Error(
-    'Irys upload not implemented. To use: npm install @irys/sdk and implement the upload logic in this function.'
-  )
+export async function testPinata(): Promise<{
+  connected: boolean
+  message: string
+  method?: string
+}> {
+  const config = getPinataConfig()
+  
+  if (!config) {
+    return {
+      connected: false,
+      message: 'Pinata not configured. Add API Key + Secret or JWT to .env file',
+    }
+  }
+  
+  const method = config.jwt ? 'JWT Token' : 'API Key'
+  const isConnected = await testPinataConnection(config)
+  
+  if (isConnected) {
+    return {
+      connected: true,
+      message: `✅ Pinata connected using ${method}!`,
+      method,
+    }
+  } else {
+    return {
+      connected: false,
+      message: `❌ Pinata connection failed using ${method}. Check your credentials.`,
+      method,
+    }
+  }
 }
 
 /**
@@ -189,3 +221,7 @@ export function validateMetadata(metadata: TokenMetadata): string | null {
   }
   return null
 }
+
+// Re-export Pinata types
+export type { PinataConfig }
+export { uploadTokenMetadataToPinata, testPinataConnection }
