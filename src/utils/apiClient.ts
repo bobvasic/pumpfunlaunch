@@ -7,32 +7,47 @@ import axios, { AxiosInstance, AxiosError } from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+console.log('[API Client] Base URL:', API_BASE_URL)
+
 class ApiClient {
   private client: AxiosInstance
 
   constructor() {
+    console.log('[API Client] Initializing with baseURL:', API_BASE_URL)
+    
     this.client = axios.create({
       baseURL: API_BASE_URL,
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 30000,
+      timeout: 10000, // Reduced timeout for faster failure detection
     })
 
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
-        console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
+        console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`)
         return config
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        console.error('[API Request Error]', error)
+        return Promise.reject(error)
+      }
     )
 
     // Response interceptor
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        console.log(`[API Response] ${response.status} ${response.config.url}`)
+        return response
+      },
       (error: AxiosError) => {
-        console.error('[API Error]', error.response?.data || error.message)
+        console.error('[API Error]', {
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          data: error.response?.data,
+        })
         return Promise.reject(error)
       }
     )
@@ -40,8 +55,15 @@ class ApiClient {
 
   // Health check
   async healthCheck() {
-    const response = await this.client.get('/health')
-    return response.data
+    try {
+      console.log('[API] Checking health at:', API_BASE_URL + '/health')
+      const response = await this.client.get('/health')
+      console.log('[API] Health check success:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('[API] Health check failed:', error)
+      throw error
+    }
   }
 
   // Generic RPC call through Python backend
@@ -71,11 +93,7 @@ class ApiClient {
   }
 
   // Get transaction history
-  async getTransactionHistory(
-    address: string,
-    limit: number = 10,
-    before?: string
-  ) {
+  async getTransactionHistory(address: string, limit: number = 10, before?: string) {
     const response = await this.client.post('/transactions/history', {
       address,
       limit,
@@ -104,7 +122,7 @@ class ApiClient {
     return response.data
   }
 
-  // Create token (prepare transaction)
+  // Prepare token creation
   async createToken(
     metadata: {
       name: string

@@ -26,17 +26,19 @@ export function usePythonBackend() {
 
   // Check backend health
   const checkHealth = useCallback(async () => {
+    console.log('[usePythonBackend] Checking health...')
     try {
       setLoading(true)
+      setError(null)
       const data = await apiClient.healthCheck()
+      console.log('[usePythonBackend] Health check success:', data)
       setHealth(data)
       setBackendAvailable(true)
-      setError(null)
       return data
     } catch (err: any) {
+      console.error('[usePythonBackend] Health check failed:', err)
       setBackendAvailable(false)
-      setError('Python backend not available. Is it running on port 8000?')
-      console.error('Backend health check failed:', err)
+      setError(err.message || 'Python backend not available. Is it running on port 8000?')
       return null
     } finally {
       setLoading(false)
@@ -185,6 +187,7 @@ export function usePythonBackend() {
 
   // Check health on mount
   useEffect(() => {
+    console.log('[usePythonBackend] Component mounted, checking health...')
     checkHealth()
     const interval = setInterval(checkHealth, 30000)
     return () => clearInterval(interval)
