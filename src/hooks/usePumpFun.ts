@@ -200,6 +200,9 @@ export function usePumpFun() {
       const confirmation = await connection.confirmTransaction(signature, 'confirmed')
       
       if (confirmation.value.err) {
+        console.error('Transaction failed:', confirmation.value.err)
+        console.error('Transaction signature:', signature)
+        console.error('Mint address:', mint.publicKey.toBase58())
         throw new Error('Transaction failed: ' + JSON.stringify(confirmation.value.err))
       }
 
@@ -221,6 +224,8 @@ export function usePumpFun() {
       let errorMessage = 'Failed to create token'
       if (error.message?.includes('insufficient funds')) {
         errorMessage = 'Insufficient SOL balance. Please add more SOL to your wallet.'
+      } else if (error.message?.includes('Custom":101')) {
+        errorMessage = 'Pump.fun program error: Invalid instruction data or insufficient funds. Make sure you have at least 0.05 SOL.'
       } else if (error.message?.includes('rejected')) {
         errorMessage = 'Transaction rejected by user'
       } else if (error.message) {
