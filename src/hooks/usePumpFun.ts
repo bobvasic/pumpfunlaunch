@@ -115,12 +115,24 @@ export function usePumpFun() {
         TOKEN_PROGRAM_ID
       )
 
+      // DEBUG: Log transaction details
+      console.log('Creating token with:', {
+        name: metadata.name,
+        symbol: metadata.symbol,
+        mint: mint.toBase58(),
+        creator: publicKey.toBase58(),
+        lamports: lamports,
+      })
+
       // Create create instruction (simplified - actual implementation needs proper instruction data)
-      // This is a placeholder for the actual pump.fun create instruction
+      // ⚠️  IMPORTANT: This is a placeholder implementation. The pump.fun program is not open source,
+      // and the exact instruction format is not publicly documented. This may not work with the
+      // current pump.fun program deployment.
       const createData = Buffer.alloc(256)
       let offset = 0
       
       // Discriminator for create instruction (you need to get the actual discriminator)
+      // This is a GUESS based on common Anchor program patterns
       createData.writeUInt8(24, offset)
       offset += 8
       
@@ -148,6 +160,9 @@ export function usePumpFun() {
       // Creator public key
       publicKey.toBuffer().copy(createData, offset)
 
+      console.log('Create instruction data length:', offset)
+      console.log('Create instruction data (hex):', createData.slice(0, offset).toString('hex'))
+
       const createInstruction = new TransactionInstruction({
         keys: [
           { pubkey: globalAccount, isSigner: false, isWritable: false },
@@ -164,6 +179,8 @@ export function usePumpFun() {
         programId: PUMP_FUN_PROGRAM,
         data: createData.slice(0, offset),
       })
+
+      console.log('Create instruction accounts:', createInstruction.keys.map(k => k.pubkey.toBase58()))
 
       transaction.add(createInstruction)
 
@@ -225,7 +242,7 @@ export function usePumpFun() {
       if (error.message?.includes('insufficient funds')) {
         errorMessage = 'Insufficient SOL balance. Please add more SOL to your wallet.'
       } else if (error.message?.includes('Custom":101')) {
-        errorMessage = 'Pump.fun program error: Invalid instruction data or insufficient funds. Make sure you have at least 0.05 SOL.'
+        errorMessage = 'Pump.fun program rejected the transaction. The instruction format in this template may be outdated or incorrect. The pump.fun program is not open source, so the exact format is not publicly documented. Check browser console for debug logs.'
       } else if (error.message?.includes('rejected')) {
         errorMessage = 'Transaction rejected by user'
       } else if (error.message) {
