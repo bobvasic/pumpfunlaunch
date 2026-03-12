@@ -108,20 +108,7 @@ export function useSPLToken() {
       )
 
       toast.success(
-        () => (
-          <div>
-            Token created successfully!
-            <br />
-            <a
-              href={`https://solscan.io/tx/${signature}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#00d084' }}
-            >
-              View on Solscan
-            </a>
-          </div>
-        ),
+        `Token created successfully! View: https://solscan.io/tx/${signature.slice(0, 20)}...`,
         { id: toastId, duration: 8000 }
       )
 
